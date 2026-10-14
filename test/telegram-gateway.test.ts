@@ -35,29 +35,7 @@ describe("GrammyTelegramGateway", () => {
   });
 
   it("drops an unauthorized command before application or Telegram API calls", async () => {
-    const receiveText = vi.fn();
-    const bot = createTelegramBot({
-      token: "test-token",
-      application: { receiveText },
-      allowedTelegramUserId: "42",
-      locale: "pt-BR",
-      timeZone: "America/Sao_Paulo"
-    });
-    bot.botInfo = {
-      id: 123,
-      is_bot: true,
-      first_name: "Hermes",
-      username: "hermes_test_bot",
-      can_join_groups: false,
-      can_read_all_group_messages: false,
-      supports_inline_queries: false,
-      can_connect_to_business: false,
-      has_main_web_app: false,
-      has_topics_enabled: false,
-      allows_users_to_create_topics: false,
-      can_manage_bots: false,
-      supports_join_request_queries: false
-    };
+    const { bot, receiveText } = createTestBot();
 
     await expect(
       bot.handleUpdate({
@@ -74,4 +52,63 @@ describe("GrammyTelegramGateway", () => {
     ).resolves.toBeUndefined();
     expect(receiveText).not.toHaveBeenCalled();
   });
+
+  it("answers an authorized help command", async () => {
+    const { bot, receiveText } = createTestBot();
+    const apiCalls: Array<{ method: string; payload: unknown }> = [];
+    bot.api.config.use((_previous, method, payload) => {
+      apiCalls.push({ method, payload });
+      return Promise.resolve({ ok: true, result: {} } as never);
+    });
+
+    await bot.handleUpdate({
+      update_id: 1003,
+      message: {
+        message_id: 2,
+        date: 1_792_000_001,
+        chat: { id: 42, type: "private", first_name: "Dono" },
+        from: { id: 42, is_bot: false, first_name: "Dono" },
+        text: "/help",
+        entities: [{ offset: 0, length: 5, type: "bot_command" }]
+      }
+    });
+
+    expect(apiCalls).toEqual([
+      {
+        method: "sendMessage",
+        payload: {
+          chat_id: 42,
+          text: "Envie uma mensagem de texto para criar uma Nota, Tarefa ou Lembrete."
+        }
+      }
+    ]);
+    expect(receiveText).not.toHaveBeenCalled();
+  });
 });
+
+function createTestBot() {
+  const receiveText = vi.fn();
+  const bot = createTelegramBot({
+    token: "test-token",
+    application: { receiveText },
+    allowedTelegramUserId: "42",
+    locale: "pt-BR",
+    timeZone: "America/Sao_Paulo"
+  });
+  bot.botInfo = {
+    id: 123,
+    is_bot: true,
+    first_name: "Hermes",
+    username: "hermes_test_bot",
+    can_join_groups: false,
+    can_read_all_group_messages: false,
+    supports_inline_queries: false,
+    can_connect_to_business: false,
+    has_main_web_app: false,
+    has_topics_enabled: false,
+    allows_users_to_create_topics: false,
+    can_manage_bots: false,
+    supports_join_request_queries: false
+  };
+  return { bot, receiveText };
+}
