@@ -127,7 +127,7 @@ const update: TelegramTextUpdate = {
 };
 
 describe("Hermes text capture seam", () => {
-  it("preserves an authorized message, interprets it, persists an Item, and confirms it", async () => {
+  it("preserves, interprets, persists, and confirms an authorized message once", async () => {
     const harness = createHarness();
 
     await expect(harness.app.receiveText(update)).resolves.toEqual({
@@ -136,6 +136,7 @@ describe("Hermes text capture seam", () => {
     });
     expect(harness.queue.jobs).toEqual([{ captureId: "capture-1" }]);
 
+    await harness.processor.process(harness.queue.jobs[0]!);
     await harness.processor.process(harness.queue.jobs[0]!);
 
     expect(harness.store.captures).toEqual([
@@ -155,6 +156,7 @@ describe("Hermes text capture seam", () => {
       })
     ]);
     expect(harness.telegram.confirmations).toEqual(harness.store.items);
+    expect(harness.interpreter.calls).toBe(1);
   });
 
   it("rejects a user outside the allowlist before persistence or interpretation", async () => {

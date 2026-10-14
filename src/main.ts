@@ -38,6 +38,7 @@ const application = new HermesApplication({
 const bot = createTelegramBot({
   token: config.telegramBotToken,
   application,
+  allowedTelegramUserId: config.allowedTelegramUserId,
   locale: config.locale,
   timeZone: config.timeZone
 });

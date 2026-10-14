@@ -8,7 +8,7 @@ export class GrammyTelegramGateway implements TelegramGateway {
   constructor(private readonly api: Pick<Api, "sendMessage">) {}
 
   async sendItemCreated(chatId: string, item: Item): Promise<void> {
-    const dueLine = item.dueAt ? `\nQuando: ${item.dueAt}` : "";
+    const dueLine = item.dueAt ? `Quando: ${item.dueAt}` : "";
     await this.api.sendMessage(
       chatId,
       [`${labelFor(item.type)}: ${item.title}`, item.body, dueLine, "Ações disponíveis: /help"]
@@ -20,13 +20,19 @@ export class GrammyTelegramGateway implements TelegramGateway {
 
 interface TelegramBotOptions {
   token: string;
-  application: HermesApplication;
+  application: Pick<HermesApplication, "receiveText">;
+  allowedTelegramUserId: string;
   locale: string;
   timeZone: string;
 }
 
 export function createTelegramBot(options: TelegramBotOptions): Bot {
   const bot = new Bot(options.token);
+
+  bot.use(async (context, next) => {
+    if (String(context.from?.id) !== options.allowedTelegramUserId) return;
+    await next();
+  });
 
   bot.command(["start", "help"], async (context) => {
     await context.reply("Envie uma mensagem de texto para criar uma Nota, Tarefa ou Lembrete.");
