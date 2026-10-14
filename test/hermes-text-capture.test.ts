@@ -32,11 +32,21 @@ class MemoryStore implements CaptureStore {
     return Promise.resolve(this.captures.find((capture) => capture.id === id));
   }
 
-  completeCapture(captureId: string, item: Item): Promise<void> {
+  findItemByCaptureId(captureId: string): Promise<Item | undefined> {
+    return Promise.resolve(this.items.find((item) => item.captureId === captureId));
+  }
+
+  saveItem(item: Item): Promise<void> {
+    if (!this.items.some((candidate) => candidate.captureId === item.captureId)) {
+      this.items.push(item);
+    }
+    return Promise.resolve();
+  }
+
+  markCaptureCompleted(captureId: string): Promise<void> {
     const capture = this.captures.find((candidate) => candidate.id === captureId);
     if (!capture) throw new Error("capture not found");
     capture.status = "completed";
-    this.items.push(item);
     return Promise.resolve();
   }
 }
@@ -66,8 +76,13 @@ class RecordingInterpreter implements Interpreter {
 
 class RecordingTelegram implements TelegramGateway {
   readonly confirmations: Item[] = [];
+  failuresRemaining = 0;
 
   sendItemCreated(_chatId: string, item: Item): Promise<void> {
+    if (this.failuresRemaining > 0) {
+      this.failuresRemaining -= 1;
+      return Promise.reject(new Error("Telegram unavailable"));
+    }
     this.confirmations.push(item);
     return Promise.resolve();
   }
@@ -162,5 +177,21 @@ describe("Hermes text capture seam", () => {
 
     expect(harness.store.captures).toHaveLength(1);
     expect(harness.queue.jobs).toEqual([{ captureId: "capture-1" }]);
+  });
+
+  it("retries confirmation without interpreting or persisting the Item twice", async () => {
+    const harness = createHarness();
+    harness.telegram.failuresRemaining = 1;
+    await harness.app.receiveText(update);
+
+    await expect(harness.processor.process(harness.queue.jobs[0]!)).rejects.toThrow("Telegram unavailable");
+    expect(harness.store.items).toHaveLength(1);
+    expect(harness.store.captures[0]?.status).toBe("queued");
+
+    await expect(harness.processor.process(harness.queue.jobs[0]!)).resolves.toBeUndefined();
+    expect(harness.interpreter.calls).toBe(1);
+    expect(harness.store.items).toHaveLength(1);
+    expect(harness.telegram.confirmations).toHaveLength(1);
+    expect(harness.store.captures[0]?.status).toBe("completed");
   });
 });

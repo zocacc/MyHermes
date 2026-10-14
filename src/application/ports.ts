@@ -3,7 +3,9 @@ import type { Capture, CaptureJob, Item, ItemDraft } from "../domain/model.js";
 export interface CaptureStore {
   createCapture(capture: Capture): Promise<"created" | "duplicate">;
   findCapture(id: string): Promise<Capture | undefined>;
-  completeCapture(captureId: string, item: Item): Promise<void>;
+  findItemByCaptureId(captureId: string): Promise<Item | undefined>;
+  saveItem(item: Item): Promise<void>;
+  markCaptureCompleted(captureId: string): Promise<void>;
 }
 
 export interface CaptureJobQueue {

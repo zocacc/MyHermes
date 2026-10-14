@@ -18,21 +18,25 @@ export class CaptureProcessor {
       return;
     }
 
-    const draft = await this.dependencies.interpreter.interpret({
-      text: capture.rawText,
-      locale: capture.locale,
-      timeZone: capture.timeZone,
-      receivedAt: capture.receivedAt
-    });
-    const item: Item = {
-      ...draft,
-      id: this.dependencies.nextId(),
-      captureId: capture.id,
-      status: "active",
-      createdAt: this.dependencies.now().toISOString()
-    };
+    let item = await this.dependencies.store.findItemByCaptureId(capture.id);
+    if (!item) {
+      const draft = await this.dependencies.interpreter.interpret({
+        text: capture.rawText,
+        locale: capture.locale,
+        timeZone: capture.timeZone,
+        receivedAt: capture.receivedAt
+      });
+      item = {
+        ...draft,
+        id: this.dependencies.nextId(),
+        captureId: capture.id,
+        status: "active",
+        createdAt: this.dependencies.now().toISOString()
+      } satisfies Item;
+      await this.dependencies.store.saveItem(item);
+    }
 
-    await this.dependencies.store.completeCapture(capture.id, item);
     await this.dependencies.telegram.sendItemCreated(capture.chatId, item);
+    await this.dependencies.store.markCaptureCompleted(capture.id);
   }
 }

@@ -40,7 +40,7 @@ describe("PostgresCaptureStore", () => {
     await expect(store.findCapture(capture.id)).resolves.toEqual(capture);
   });
 
-  it("persists an Item and completes its Capture atomically", async () => {
+  it("persists one Item per Capture and marks the Capture completed separately", async () => {
     const capture = buildCapture();
     const item: Item = {
       id: "item-1",
@@ -54,7 +54,11 @@ describe("PostgresCaptureStore", () => {
     };
     await store.createCapture(capture);
 
-    await store.completeCapture(capture.id, item);
+    await store.saveItem(item);
+    await store.saveItem({ ...item, id: "item-duplicate" });
+
+    await expect(store.findItemByCaptureId(capture.id)).resolves.toEqual(item);
+    await store.markCaptureCompleted(capture.id);
 
     await expect(store.findCapture(capture.id)).resolves.toEqual({
       ...capture,

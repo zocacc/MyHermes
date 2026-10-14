@@ -5,13 +5,13 @@ import type { TelegramGateway } from "../../application/ports.js";
 import type { Item } from "../../domain/model.js";
 
 export class GrammyTelegramGateway implements TelegramGateway {
-  constructor(private readonly api: Api) {}
+  constructor(private readonly api: Pick<Api, "sendMessage">) {}
 
   async sendItemCreated(chatId: string, item: Item): Promise<void> {
     const dueLine = item.dueAt ? `\nQuando: ${item.dueAt}` : "";
     await this.api.sendMessage(
       chatId,
-      [`${labelFor(item.type)} criado: ${item.title}`, item.body, dueLine, `Ações: /edit ${item.id} · /delete ${item.id}`]
+      [`${labelFor(item.type)}: ${item.title}`, item.body, dueLine, "Ações disponíveis: /help"]
         .filter(Boolean)
         .join("\n")
     );
@@ -27,6 +27,10 @@ interface TelegramBotOptions {
 
 export function createTelegramBot(options: TelegramBotOptions): Bot {
   const bot = new Bot(options.token);
+
+  bot.command(["start", "help"], async (context) => {
+    await context.reply("Envie uma mensagem de texto para criar uma Nota, Tarefa ou Lembrete.");
+  });
 
   bot.on("message:text", async (context) => {
     await options.application.receiveText({

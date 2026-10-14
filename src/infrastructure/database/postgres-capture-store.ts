@@ -38,13 +38,25 @@ export class PostgresCaptureStore implements CaptureStore {
     };
   }
 
-  async completeCapture(captureId: string, item: Item): Promise<void> {
-    await this.database.transaction(async (transaction) => {
-      await transaction.insert(items).values(item).onConflictDoNothing({ target: items.captureId });
-      await transaction
-        .update(captures)
-        .set({ status: "completed" })
-        .where(eq(captures.id, captureId));
-    });
+  async findItemByCaptureId(captureId: string): Promise<Item | undefined> {
+    const [item] = await this.database.select().from(items).where(eq(items.captureId, captureId)).limit(1);
+    if (!item) return undefined;
+
+    return {
+      ...item,
+      dueAt: item.dueAt ? new Date(item.dueAt).toISOString() : null,
+      createdAt: new Date(item.createdAt).toISOString()
+    };
+  }
+
+  async saveItem(item: Item): Promise<void> {
+    await this.database.insert(items).values(item).onConflictDoNothing({ target: items.captureId });
+  }
+
+  async markCaptureCompleted(captureId: string): Promise<void> {
+    await this.database
+      .update(captures)
+      .set({ status: "completed" })
+      .where(eq(captures.id, captureId));
   }
 }
